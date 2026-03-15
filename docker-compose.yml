@@ -1,0 +1,54 @@
+services:
+  # Para gestionar la BBDD con PostgreSQL:
+
+  postgres:
+    env_file: .env
+    image: ${DB_APP_PG}  # Usa la última imagen de PostgreSQL
+    container_name: postgres_db # Nombre del contenedor
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER}  # Usuario de la base de datos
+      POSTGRES_PASSWORD: ${DB_PASS}  # Contraseña del usuario
+      POSTGRES_DB: ${DB_NAME_PG}  # Nombre de la base de datos
+    ports:
+      - "${DB_PORT_PG}:${DB_PORT_PG}"  # Expone el puerto 5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data  # Persistencia de datos
+# Para gestionar PostgreSQL con una interfaz gráfica:
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: pgadmin_container
+    depends_on:
+      - postgres
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGA_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGA_PASS}
+    ports:
+      - "5050:80"
+
+  mysql:
+    env_file: .env
+    image: ${DB_APP_MYSQL}
+    container_name: mysql_db
+    restart: unless-stopped
+    environment:
+      MYSQL_PASSWORD: ${DB_PASS}
+      MYSQL_DATABASE: ${DB_NAME_MYSQL}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASS}
+    ports:
+      - "${DB_PORT_MYSQL}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    environment:
+      MYSQL_ROOT_PASSWORD: ${PHP_PASS}
+      PMA_HOST: mysql
+    ports:
+      - "8080:80"
+
+volumes:
+  postgres_data:  # Define el volumen
+  mysql_data:  # Define el volumen
