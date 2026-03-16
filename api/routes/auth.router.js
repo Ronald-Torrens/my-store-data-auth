@@ -3,13 +3,40 @@ const passport = require('passport');
 
 const router = express.Router();
 
+const { loginLimiter, recoveryLimiter, changePasswordLimiter } = require('../middleware/rateLimiter.handler');
 const validatorHandler = require('../middleware/validator.handler');
 const { loginAuthSchema, recoveryAuthSchema, changePasswordAuthSchema } = require('../schemas/auth.schemas');
 
 const AuthService = require('../services/auth.service');
 const service = new AuthService();
 
+
+/**
+ * @swagger
+ * /auth/login:
+ *   post:
+ *     summary: Login user
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 example: user@mail.com
+ *               password:
+ *                 type: string
+ *                 example: 123456
+ *     responses:
+ *       200:
+ *         description: Login successful
+ */
+
 router.post('/login',
+  loginLimiter,
   validatorHandler(loginAuthSchema, 'body'),
   passport.authenticate('local', { session: false }),
   async (req, res, next) => {
@@ -24,6 +51,7 @@ router.post('/login',
 );
 
 router.post('/recovery',
+  recoveryLimiter,
   validatorHandler(recoveryAuthSchema, 'body'),
   async (req, res, next) => {
     try {
@@ -37,8 +65,8 @@ router.post('/recovery',
 );
 
 router.post('/change-password',
+  changePasswordLimiter,
   validatorHandler(changePasswordAuthSchema, 'body'),
-  //passport.authenticate('jwt', { session: false }),
   async (req, res, next) => {
     try {
       const { token, newPassword } = req.body;
