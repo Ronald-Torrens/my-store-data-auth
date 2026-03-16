@@ -6,6 +6,9 @@ const { checkApiKey } = require('./middleware/auth.handler');
 
 const { errorHandler, logErrors, boomErrorHandler, sqlErrorHandler } = require('./middleware/error.handler');
 
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpecs = require('./docs/swagger');
+
 const app = express();
 const port = process.env.PORT || 3000;
 app.use(express.json());
@@ -30,6 +33,8 @@ require('./utils/auth'); // Ejecuta estrategia de autenticación
 app.get('/api', checkApiKey, (req, res) => {
   res.send(`<h1>Server with Express.js, data persistence with PostgreSQL and Authentication with JWT...</h1>`);
 });
+
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpecs));
 
 routerApi(app);
 
