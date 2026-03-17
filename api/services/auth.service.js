@@ -43,24 +43,72 @@ class AuthService {
   };
 
   async signToken( user ) {
-    const jwtConfig = {
-      expiresIn: '7d'
-    };
     const payload = {
       sub: user.id,
       role: user.role
     };
-    const token = jwt.sign(payload, config.jwtSecret, jwtConfig);
+
+    const accessToken = jwt.sign(payload, config.jwtSecret, {
+      expiresIn: '15m'
+    });
+
+    const refreshToken = jwt.sign(payload, config.jwtSecret, {
+      expiresIn: '7d'
+    });
+
+    await service.update(user.id, { refreshToken });
 
     const userData = user.toJSON();
     delete userData.password;      // eliminar password antes de responder
-    delete userData.recoveryToken; // eliminar recoveryToken antes de responder
+    delete userData.recoveryToken;
+    delete userData.refreshToken; // eliminar recoveryToken antes de responder
 
     return {
       user: userData,
-      token
+      accessToken,
+      refreshToken
     };
   };
+
+  async refreshToken(refreshToken) {
+  try {
+    const payload = jwt.verify(refreshToken, config.jwtSecret);
+
+    const user = await service.findOneWithRefreshToken(payload.sub);
+
+    if (!user || user.refreshToken !== refreshToken) {
+      throw boom.unauthorized();
+    };
+
+    const newAccessToken = jwt.sign(
+      { sub: user.id, role: user.role },
+      config.jwtSecret,
+      { expiresIn: '15m' }
+    );
+
+    // 🔥 NUEVO refresh token
+    const newRefreshToken = jwt.sign(
+      { sub: user.id, role: user.role },
+      config.jwtSecret,
+      { expiresIn: '7d' }
+    );
+
+    // 🔥 guardar el nuevo (mata el anterior)
+    await service.update(user.id, {
+      refreshToken: newRefreshToken
+    });
+
+    delete user.refreshToken;
+
+    return {
+      accessToken: newAccessToken,
+      refreshToken: newRefreshToken
+    };
+
+  } catch (error) {
+    throw boom.unauthorized('Invalid refresh token');
+  };
+};
 
   async sendRecovery( email ) {
     const user = await service.findByEmail(email);
@@ -69,7 +117,7 @@ class AuthService {
     };
 
     const payload = { sub: user.id };
-    const token = jwt.sign(payload, config.jwtSecret, {expiresIn: '15min'});
+    const token = jwt.sign(payload, config.jwtRecoverySecret, {expiresIn: '15min'});
     const link = `https://myfrontend.com/recovery?token=${token}`;
     await service.update(user.id, { recoveryToken: token })
 
@@ -100,10 +148,10 @@ class AuthService {
 
   async changePassword(token, newPassword) {
     try {
-      const payload = jwt.verify(token, config.jwtSecret);
+      const payload = jwt.verify(token, config.jwtRecoverySecret);
       const user = await service.findOneWithRecoveryToken(payload.sub);
 
-      if ( user.recoveryToken !== token ) {
+      if ( !user || user.recoveryToken !== token ) {
         throw boom.unauthorized();
       };
 

@@ -10,6 +10,7 @@ const dbPort = process.env.DB_PORT_PG || process.env.PGPORT || 5432;
 // Variables para auth0 - Estrategias de Autenticación
 const apiKey = process.env.API_KEY
 const jwtSecret = process.env.JWT_SECRET
+const jwtRecoverySecret = process.env.JWT_RECOVERY_SECRET
 
 // Variables para recuperación de correo - Estrategias de Autenticación
 const smtpHost = process.env.SMTP_HOST
@@ -34,6 +35,7 @@ const config = {
   dbUrl,
   apiKey,
   jwtSecret,
+  jwtRecoverySecret,
   smtpHost,
   smtpPort,
   smtpUser,

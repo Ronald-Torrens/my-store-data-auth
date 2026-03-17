@@ -50,6 +50,18 @@ router.post('/login',
   }
 );
 
+router.post('/refresh',
+  async (req, res, next) => {
+    try {
+      const { refreshToken } = req.body;
+      const response = await service.refreshToken(refreshToken)
+      res.status(200).json(response);
+    } catch (error) {
+      next(error);
+    };
+  }
+);
+
 router.post('/recovery',
   recoveryLimiter,
   validatorHandler(recoveryAuthSchema, 'body'),

@@ -52,6 +52,14 @@ class UsersService {
     return user;
   };
 
+  async findOneWithRefreshToken(id) {
+    const user = await models.User.scope('withRefreshToken').findByPk(id);
+    if(!user) {
+      throw boom.notFound('User not found.');
+    };
+    return user;
+  };
+
   async update(id, changes) {
     const user = await this.findOne(id);
     const userUpdate = await user.update(changes);

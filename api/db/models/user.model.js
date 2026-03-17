@@ -24,6 +24,11 @@ const UserSchema = {
     allowNull: true,
     type: DataTypes.STRING
   },
+  refreshToken: {
+    field: 'refresh_token',
+    allowNull: true,
+    type: DataTypes.STRING
+  },
   role: {
     allowNull: false,
     type: DataTypes.STRING,
@@ -53,7 +58,7 @@ class User extends Model {
       timestamps: false,
       defaultScope: { // Siempre oculta para respuestas de todas las consultas
         attributes: {
-          exclude: ['password', 'recoveryToken']
+          exclude: ['password', 'recoveryToken', 'refreshToken']
         }
       },
       scopes: {
@@ -62,6 +67,9 @@ class User extends Model {
         },
         withRecoveryToken: {
           attributes: ['id', 'email', 'recoveryToken']
+        },
+        withRefreshToken: {
+          attributes: ['id', 'refreshToken']
         }
       }
     };
