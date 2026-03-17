@@ -26,16 +26,21 @@ const dbUrl =
 const config = {
   env: process.env.NODE_ENV || 'development',
   isProd: process.env.NODE_ENV === 'production',
+  isTest: process.env.NODE_ENV === 'test',
+
   port: process.env.PORT || 3000,
+
   dbUser,
   dbPassword,
   dbHost,
   dbName,
   dbPort,
   dbUrl,
+
   apiKey,
   jwtSecret,
   jwtRecoverySecret,
+
   smtpHost,
   smtpPort,
   smtpUser,

@@ -13,7 +13,7 @@ const URI = `postgres://${USER}:${PASSWORD}@${config.dbHost}:${config.dbPort}/${
 // Configuración Sequelize
 const options = {
   dialect: 'postgres',
-  logging: config.isProd ? false : console.log, // Logging solo en dev
+  logging: config.isProd || config.isTest ? false : console.log, // Logging solo en dev
 };
 
 // SSL en producción (Railway, Render, Heroku)
