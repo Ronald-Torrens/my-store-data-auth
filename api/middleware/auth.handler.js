@@ -1,11 +1,12 @@
-
 const boom = require('@hapi/boom');
+const bcrypt = require('bcrypt');
 
 const { config } = require('../config/config');
 
-function checkApiKey ( req, res, next ) {
+async function checkApiKey ( req, res, next ) {
   const apiKey = req.headers['api'];
-  if ( apiKey === config.apiKey ) {
+  const isMatch = await bcrypt.compare(apiKey, config.apiKey);
+  if ( isMatch ) {
     next();
   } else {
     next( boom.unauthorized() );

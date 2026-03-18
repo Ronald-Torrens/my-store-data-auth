@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ quiet: true });
 
 // Variables para DB
 const dbUser = process.env.DB_USER || process.env.PGUSER;

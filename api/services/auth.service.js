@@ -2,42 +2,28 @@ const boom = require('@hapi/boom');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { config } = require('../config/config');
-const nodemailer = require("nodemailer");
 
 const UserService = require('./users.service');
-const service = new UserService();
+const MailService = require('./mail.service');
+
+const { buildRecoveryEmail, buildPasswordChangedEmail } = require('../libs/mail.builder');
 
 class AuthService {
-  constructor() {
-    this.transporter = nodemailer.createTransport({ // sugerencia de ChatGPT
-      host: config.smtpHost,
-      port: config.smtpPort,
-      secure: false,
-      auth: {
-        user: config.smtpUser,
-        pass: config.smtpPassword
-      }
-    });
-    // helper interno para construir mails
-    this.mailHelper = (to, subject, htmlBody) => {
-      return {
-        from: `LanTech ${config.smtpUser}`,
-        to,
-        subject,
-        html: htmlBody
-      };
-    };
+  constructor(userService, mailService) {
+    this.userService = userService || new UserService();
+    this.mailService = mailService || new MailService();
   };
 
+
   async getUser( email, password ) {
-    const user = await service.findByEmailWithPassword(email);
+    const user = await this.userService.findByEmailWithPassword(email);
     if ( !user ) {
-        throw boom.unauthorized();
+        throw boom.unauthorized('Invalid credentials');
     };
 
     const isMatch = await bcrypt.compare(password, user.password);
     if ( !isMatch ) {
-        throw boom.unauthorized();
+        throw boom.unauthorized('Invalid credentials');
     };
     return user;
   };
@@ -56,7 +42,7 @@ class AuthService {
       expiresIn: '7d'
     });
 
-    await service.update(user.id, { refreshToken });
+    await this.userService.update(user.id, { refreshToken });
 
     const userData = user.toJSON();
     delete userData.password;      // eliminar password antes de responder
@@ -74,10 +60,10 @@ class AuthService {
   try {
     const payload = jwt.verify(refreshToken, config.jwtSecret);
 
-    const user = await service.findOneWithRefreshToken(payload.sub);
+    const user = await this.userService.findOneWithRefreshToken(payload.sub);
 
     if (!user || user.refreshToken !== refreshToken) {
-      throw boom.unauthorized();
+      throw boom.unauthorized('Invalid credentials');
     };
 
     const newAccessToken = jwt.sign(
@@ -94,11 +80,12 @@ class AuthService {
     );
 
     // 🔥 guardar el nuevo (mata el anterior)
-    await service.update(user.id, {
+    await this.userService.update(user.id, {
       refreshToken: newRefreshToken
     });
 
-    delete user.refreshToken;
+    const userData = user.toJSON();
+    delete userData.refreshToken;
 
     return {
       accessToken: newAccessToken,
@@ -106,78 +93,47 @@ class AuthService {
     };
 
   } catch (error) {
+    if (error.name === 'TokenExpiredError') {
+      throw boom.unauthorized('Refresh token expired');
+    }
     throw boom.unauthorized('Invalid refresh token');
   };
 };
 
   async sendRecovery( email ) {
-    const user = await service.findByEmail(email);
+    const user = await this.userService.findByEmail(email);
     if ( !user ) {
-      throw boom.unauthorized();
+      throw boom.unauthorized('Invalid credentials');
     };
 
     const payload = { sub: user.id };
     const token = jwt.sign(payload, config.jwtRecoverySecret, {expiresIn: '15min'});
-    const link = `https://myfrontend.com/recovery?token=${token}`;
-    await service.update(user.id, { recoveryToken: token })
+    await this.userService.update(user.id, { recoveryToken: token })
 
-    const mailRecovery = this.mailHelper(
-      user.email,
-      "Recuperación de contraseña...",
-      `
-      <b>Si desea cambiar la contraseña de su cuenta, por favor, ingrese al siguiente link:</b>
-      <br>
-      ${link}
-      `
-    );
+    const mailRecovery = buildRecoveryEmail(user.email, token)
 
-    await this.sendMail(mailRecovery);
+    await this.mailService.sendMail(mailRecovery);
     return { message: 'Mail sent.' };
   }
-
-  async sendMail(infoMail) {
-    try {
-      const info = await this.transporter.sendMail(infoMail);
-      console.log('Mail enviado:', info);
-
-    } catch (err) {
-      console.error('Error enviando mail:', err);
-      throw err;
-    };
-  };
 
   async changePassword(token, newPassword) {
     try {
       const payload = jwt.verify(token, config.jwtRecoverySecret);
-      const user = await service.findOneWithRecoveryToken(payload.sub);
+      const user = await this.userService.findOneWithRecoveryToken(payload.sub);
 
       if ( !user || user.recoveryToken !== token ) {
-        throw boom.unauthorized();
+        throw boom.unauthorized('Invalid credentials');
       };
 
       const hash = await bcrypt.hash(newPassword, 10);
-      await service.update(user.id, {
+      await this.userService.update(user.id, {
         recoveryToken: null,
         password: hash
       });
 
-      const mailConfirmation = this.mailHelper(
-        user.email,
-        "Recuperación de contraseña exitosa.",
-        `
-        <strong>Hola</strong>
-        <br><br>
-        Tu contraseña ha sido cambiada correctamente.
-        <br><br>
-        <i>Si no realizaste este cambio, por favor, contacta inmediatamente al Soporte Técnico.</i>
-        <br><br>
-        Saludos,
-        <br>
-        <b>LanTech</b>
-        `
-      );
+      const mailConfirmation = buildPasswordChangedEmail(user.email);
 
-      await this.sendMail(mailConfirmation)
+      await this.mailService.sendMail(mailConfirmation)
       return { message: 'Password changed successfully..!' };
 
     } catch (error) {
