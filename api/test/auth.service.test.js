@@ -5,13 +5,20 @@ const bcrypt = require('bcrypt');
 jest.mock('jsonwebtoken');
 
 jest.mock('bcrypt', () => ({
-  compare: jest.fn()
+  compare: jest.fn(),
+  hash: jest.fn()
 }));
 
 const fakeUserService = {
   update: jest.fn(),
   findOneWithRefreshToken: jest.fn(),
-  findByEmailWithPassword: jest.fn()
+  findByEmailWithPassword: jest.fn(),
+  findByEmail: jest.fn(),
+  findOneWithRecoveryToken: jest.fn()
+};
+
+const fakeMailService = {
+  sendMail: jest.fn()
 };
 
 describe('AuthService', () => {
@@ -19,7 +26,7 @@ describe('AuthService', () => {
   let service;
 
   beforeEach(() => {
-    service = new AuthService(fakeUserService);
+    service = new AuthService(fakeUserService, fakeMailService);
 
     jest.clearAllMocks();
 
@@ -158,28 +165,97 @@ describe('AuthService', () => {
       email: 'test@test.com'
     };
 
-    const fakeMailService = {
-      sendMail: jest.fn()
-    };
-
-    const fakeUserService = {
-      findByEmail: jest.fn().mockResolvedValue(fakeUser),
-      update: jest.fn()
-    };
+    service.userService.findByEmail.mockResolvedValue(fakeUser);
 
     jwt.sign.mockReturnValue('fake-token');
 
-    const service = new AuthService(fakeUserService, fakeMailService);
-
     const result = await service.sendRecovery('test@test.com');
 
-    expect(fakeUserService.update).toHaveBeenCalledWith(1, {
+    expect(service.userService.update).toHaveBeenCalledWith(1, {
       recoveryToken: 'fake-token'
     });
 
-    expect(fakeMailService.sendMail).toHaveBeenCalled();
+    expect(service.mailService.sendMail).toHaveBeenCalled();
 
     expect(result).toEqual({ message: 'Mail sent.' });
+  });
+
+  // Test para cambio de contraseñas (changePassword):
+
+  //  1. ❌ Token inválido: jwt.verify lanza error
+
+  it('should throw error if token is invalid', async () => {
+
+    jwt.verify.mockImplementation(() => {
+      throw new Error('invalid token');
+    });
+
+    await expect(
+      service.changePassword('bad-token', '123456')
+    ).rejects.toThrow();
+
+  });
+
+  //  2. ❌ Usuario no existe: findOneWithRecoveryToken → null
+
+  it('should throw error if user not found', async () => {
+
+    jwt.verify.mockReturnValue({ sub: 1 });
+
+    service.userService.findOneWithRecoveryToken.mockResolvedValue(null);
+
+    await expect(
+      service.changePassword('valid-token', '123456')
+    ).rejects.toThrow();
+
+  });
+
+  //  3. ❌ Token no coincide: user.recoveryToken !== token
+
+  it('should throw error if token does not match', async () => {
+
+    jwt.verify.mockReturnValue({ sub: 1 });
+
+    service.userService.findOneWithRecoveryToken.mockResolvedValue({
+      id: 1,
+      recoveryToken: 'different-token'
+    });
+
+    await expect(
+      service.changePassword('valid-token', '123456')
+    ).rejects.toThrow();
+
+  });
+
+  //  4. ✅ Caso feliz: todo correcto
+
+  it('should change password successfully', async () => {
+
+    jwt.verify.mockReturnValue({ sub: 1 });
+
+    const fakeUser = {
+      id: 1,
+      email: 'test@test.com',
+      recoveryToken: 'valid-token'
+    };
+
+    service.userService.findOneWithRecoveryToken.mockResolvedValue(fakeUser);
+
+    bcrypt.hash.mockResolvedValue('hashed-password');
+
+    const result = await service.changePassword('valid-token', '123456');
+
+    expect(service.userService.update).toHaveBeenCalledWith(1, {
+      recoveryToken: null,
+      password: 'hashed-password'
+    });
+
+    expect(service.mailService.sendMail).toHaveBeenCalled();
+
+    expect(result).toEqual({
+      message: 'Password changed successfully..!'
+    });
+
   });
 
 

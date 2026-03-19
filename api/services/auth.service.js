@@ -1,12 +1,13 @@
 const boom = require('@hapi/boom');
-const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { config } = require('../config/config');
 
 const UserService = require('./users.service');
 const MailService = require('./mail.service');
 
+const { hashData, compareData } = require('../utils/security/hash');
 const { buildRecoveryEmail, buildPasswordChangedEmail } = require('../libs/mail.builder');
+const { signToken, verifyToken } = require('../utils/security/token')
 
 class AuthService {
   constructor(userService, mailService) {
@@ -14,14 +15,13 @@ class AuthService {
     this.mailService = mailService || new MailService();
   };
 
-
   async getUser( email, password ) {
     const user = await this.userService.findByEmailWithPassword(email);
     if ( !user ) {
         throw boom.unauthorized('Invalid credentials');
     };
 
-    const isMatch = await bcrypt.compare(password, user.password);
+    const isMatch = await compareData(password, user.password);
     if ( !isMatch ) {
         throw boom.unauthorized('Invalid credentials');
     };
@@ -34,15 +34,15 @@ class AuthService {
       role: user.role
     };
 
-    const accessToken = jwt.sign(payload, config.jwtSecret, {
-      expiresIn: '15m'
-    });
+    const accessToken = signToken(payload, '15m');
 
-    const refreshToken = jwt.sign(payload, config.jwtSecret, {
-      expiresIn: '7d'
-    });
+    const refreshToken = signToken(payload, '7d');
 
-    await this.userService.update(user.id, { refreshToken });
+    const hashedRefreshToken = await hashData(refreshToken);
+
+    await this.userService.update(user.id, {
+      refreshToken: hashedRefreshToken
+    });
 
     const userData = user.toJSON();
     delete userData.password;      // eliminar password antes de responder
@@ -58,34 +58,40 @@ class AuthService {
 
   async refreshToken(refreshToken) {
   try {
-    const payload = jwt.verify(refreshToken, config.jwtSecret);
+    const payload = verifyToken(refreshToken);
 
     const user = await this.userService.findOneWithRefreshToken(payload.sub);
 
-    if (!user || user.refreshToken !== refreshToken) {
+    // 1. validar primero que el usuario y su refreshToken, existan en la BD:
+    if (!user) {
       throw boom.unauthorized('Invalid credentials');
-    };
+    }
 
-    const newAccessToken = jwt.sign(
-      { sub: user.id, role: user.role },
-      config.jwtSecret,
-      { expiresIn: '15m' }
+    if (!user.refreshToken) {
+      throw boom.unauthorized('Invalid credentials');
+    }
+
+    // 2. luego comparar
+    const isMatch = await compareData(refreshToken, user.refreshToken);
+
+    if (!isMatch) {
+      throw boom.unauthorized('Invalid credentials');
+    }
+
+    // 3. generar nuevos tokens
+    const newAccessToken = signToken(
+      { sub: user.id, role: user.role }, '15m'
     );
 
-    // 🔥 NUEVO refresh token
-    const newRefreshToken = jwt.sign(
-      { sub: user.id, role: user.role },
-      config.jwtSecret,
-      { expiresIn: '7d' }
+    const newRefreshToken = signToken(
+      { sub: user.id, role: user.role }, '7d'
     );
 
-    // 🔥 guardar el nuevo (mata el anterior)
+    const hashedRefreshToken = await hashData(newRefreshToken);
+
     await this.userService.update(user.id, {
-      refreshToken: newRefreshToken
+      refreshToken: hashedRefreshToken
     });
-
-    const userData = user.toJSON();
-    delete userData.refreshToken;
 
     return {
       accessToken: newAccessToken,
@@ -107,10 +113,11 @@ class AuthService {
     };
 
     const payload = { sub: user.id };
-    const token = jwt.sign(payload, config.jwtRecoverySecret, {expiresIn: '15min'});
-    await this.userService.update(user.id, { recoveryToken: token })
+    const token = signToken(payload, '15m', config.jwtRecoverySecret);
+    const hashedToken = await hashData(token);
+    await this.userService.update(user.id, { recoveryToken: hashedToken });
 
-    const mailRecovery = buildRecoveryEmail(user.email, token)
+    const mailRecovery = buildRecoveryEmail(user.email, token);
 
     await this.mailService.sendMail(mailRecovery);
     return { message: 'Mail sent.' };
@@ -118,14 +125,20 @@ class AuthService {
 
   async changePassword(token, newPassword) {
     try {
-      const payload = jwt.verify(token, config.jwtRecoverySecret);
+      const payload = verifyToken(token, config.jwtRecoverySecret);
       const user = await this.userService.findOneWithRecoveryToken(payload.sub);
 
-      if ( !user || user.recoveryToken !== token ) {
+      if (!user || !user.recoveryToken) {
         throw boom.unauthorized('Invalid credentials');
       };
 
-      const hash = await bcrypt.hash(newPassword, 10);
+      const isMatch = await compareData(token, user.recoveryToken);
+
+      if (!isMatch) {
+        throw boom.unauthorized('Invalid credentials');
+      };
+
+      const hash = await hashData(newPassword);
       await this.userService.update(user.id, {
         recoveryToken: null,
         password: hash

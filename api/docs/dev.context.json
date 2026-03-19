@@ -1,0 +1,62 @@
+{
+  "project": "NodeJS Authentication API",
+  "stack": {
+    "backend": "Node.js",
+    "framework": "Express",
+    "orm": "Sequelize",
+    "auth": "JWT",
+    "hashing": "bcrypt",
+    "testing": "Jest"
+  },
+  "architecture": {
+    "services": [
+      "AuthService",
+      "UserService",
+      "MailService"
+    ],
+    "libs": [
+      "mail.builder",
+      "security/hash"
+    ]
+  },
+  "current_state": {
+    "auth_flow": "complete",
+    "tests": "passing",
+    "features": [
+      "login with JWT",
+      "accessToken + refreshToken",
+      "refresh token rotation",
+      "password recovery via email",
+      "password change",
+      "hashing passwords",
+      "hashing refresh tokens"
+    ]
+  },
+  "security": {
+    "password_hashing": true,
+    "refresh_token_hashing": true,
+    "jwt_verification": true,
+    "token_rotation": true
+  },
+  "key_decisions": [
+    "Refresh tokens are hashed before storing in DB",
+    "JWT is verified before DB lookup",
+    "bcrypt.compare is used for token validation",
+    "Mail logic separated into MailService",
+    "Email templates handled via mail.builder"
+  ],
+  "pending_topics": [
+    "logout (invalidate refresh token)",
+    "role-based authorization",
+    "middleware for auth/roles"
+  ],
+  "known_patterns": {
+    "refresh_flow": [
+      "verify JWT",
+      "find user",
+      "compare hashed refresh token",
+      "generate new tokens",
+      "store new hashed refresh token"
+    ]
+  }
+}

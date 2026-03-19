@@ -28,11 +28,13 @@ const buildPasswordChangedEmail = (to) => {
     html: `
       <strong>Hola</strong>
       <br><br>
-      Tu contraseña ha sido cambiada correctamente.
-      <br>
-      <i>Si no realizaste este cambio, por favor, contacta inmediatamente a Soporte Técnico.</i>
+      La contraseña de la cuenta se ha restablecido recientemente.
+      Si lo ha hecho, este mensaje es solo para su información.
       <br><br>
-      Saludos,
+      <i>Si no está seguro de si <b>usted</b> o su <b>administrador</b> ha realizado este restablecimiento de
+      contraseña, debe ponerse en contacto con Soporte Técnico inmediatamente.</i>
+      <br><br>
+      Atentamente,
       <br>
       <b>LanTech</b>
     `
