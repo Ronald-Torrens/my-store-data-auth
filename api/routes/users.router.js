@@ -10,8 +10,10 @@ const { createUserSchema, getUserSchema, updateUserSchema } = require('../schema
 const passport = require('passport');
 const { checkRoles, checkOwnershipOrAdmin } = require('../middleware/auth.handler');
 
+const jwtAuth = passport.authenticate('jwt', { session: false });
+
 router.get('/',
-  passport.authenticate('jwt', { session: false }),
+  jwtAuth,
   checkRoles('admin'),
   async (req, res, next) => {
     try {
@@ -24,7 +26,7 @@ router.get('/',
 );
 
 router.get('/:id',
-  passport.authenticate('jwt', { session: false }),
+  jwtAuth,
   checkOwnershipOrAdmin('id'),
   validatorHandler(getUserSchema, 'params'),
   async (req, res, next) => {
@@ -52,7 +54,7 @@ router.post('/',
 );
 
 router.patch('/:id',
-  passport.authenticate('jwt', { session: false }),
+  jwtAuth,
   checkOwnershipOrAdmin('id'),
   validatorHandler(getUserSchema, 'params'),
   validatorHandler(updateUserSchema, 'body'),
@@ -61,8 +63,8 @@ router.patch('/:id',
       const body = req.body;
       const { id } = req.params;
       const currentUser = req.user;
-      const updateUser = await service.update(id, body, currentUser);
-      res.status(201).json(updateUser);
+      const updateUser = await service.updateByUser(id, body, currentUser);
+      res.status(200).json(updateUser);
     } catch (error) {
       next(error);
     };
@@ -70,7 +72,7 @@ router.patch('/:id',
 );
 
 router.delete('/:id',
-  passport.authenticate('jwt', { session: false }),
+  jwtAuth,
   checkRoles('admin'),
   validatorHandler(getUserSchema, 'params'),
   async (req, res, next) => {

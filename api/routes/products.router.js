@@ -8,7 +8,7 @@ const validatorHandler = require('../middleware/validator.handler');
 const { createProductSchema, updateProductSchema, getProductSchema, queryProductSchema } = require('../schemas/products.schemas');
 
 const passport = require('passport');
-const { checkAdminRole, checkRoles } = require('../middleware/auth.handler');
+const { checkRoles, checkOwnershipOrAdmin } = require('../middleware/auth.handler');
 
 
 router.get('/',
@@ -79,7 +79,7 @@ router.patch('/:id',
 
 router.delete('/:id',
   passport.authenticate('jwt', { session: false }),
-  checkAdminRole,
+  checkOwnershipOrAdmin,
   validatorHandler(getProductSchema, 'params'),
   async (req, res, next) => {
     try {

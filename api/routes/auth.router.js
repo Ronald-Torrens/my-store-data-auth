@@ -37,8 +37,8 @@ const service = new AuthService();
 
 router.post('/login',
   loginLimiter,
-  passport.authenticate('local', { session: false }),
   validatorHandler(loginAuthSchema, 'body'),
+  passport.authenticate('local', { session: false }),
   async (req, res, next) => {
     try {
       const user = req.user;

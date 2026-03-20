@@ -29,7 +29,7 @@ function checkRoles ( ...roles ) {
 const checkOwnershipOrAdmin = (paramIdField = 'id') => {
   return (req, res, next) => {
     const user = req.user;
-    const resourceId = parseInt(req.params[paramIdField]);
+    const resourceId = Number(req.params[paramIdField]);
 
     if (user.role === 'admin' || user.sub === resourceId) {
       return next();

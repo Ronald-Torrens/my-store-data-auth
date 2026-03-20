@@ -9,7 +9,7 @@ const service = new CategoriesService();
 const validatorHandler = require('../middleware/validator.handler');
 const { createCategorySchema, getCategorySchema, updateCategorySchema } = require('../schemas/categories.schemas');
 
-const { checkAdminRole, checkRoles } = require('../middleware/auth.handler');
+const { checkOwnershipOrAdmin, checkRoles } = require('../middleware/auth.handler');
 
 router.get('/',
   //passport.authenticate('jwt', { session: false }),
@@ -68,7 +68,7 @@ router.patch('/:id',
 
 router.delete('/:id',
   passport.authenticate('jwt', { session: false }),
-  checkAdminRole,
+  checkOwnershipOrAdmin,
   validatorHandler(getCategorySchema, 'params'),
   async (req, res, next) => {
     try {

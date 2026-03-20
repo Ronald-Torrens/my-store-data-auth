@@ -60,7 +60,7 @@ class UsersService {
     return user;
   };
 
-  async update(id, changes, currentUser) {
+  async updateByUser(id, changes, currentUser) {
     const user = await this.findOne(id);
 
     // usuario normal
@@ -77,13 +77,18 @@ class UsersService {
     return await user.update(changes);
   };
 
+  async updateBySystem(id, changes) {
+    const user = await this.findOne(id);
+    return await user.update(changes);
+  };
+
   async delete(id, currentUser) {
     const user = await this.findOne(id);
 
     // ❌ evitar que el admin se elimine a sí mismo
-    if (currentUser.sub === parseInt(id)) {
+    if (currentUser.sub === user.id) {
       throw boom.forbidden('You cannot delete your own account');
-    }
+    };
 
     await user.destroy();
 

@@ -39,7 +39,7 @@ class AuthService {
 
     const hashedRefreshToken = await hashData(refreshToken);
 
-    await this.userService.update(user.id, {
+    await this.userService.updateBySystem(user.id, {
       refreshToken: hashedRefreshToken
     });
 
@@ -88,7 +88,7 @@ class AuthService {
 
       const hashedRefreshToken = await hashData(newRefreshToken);
 
-      await this.userService.update(user.id, {
+      await this.userService.updateBySystem(user.id, {
         refreshToken: hashedRefreshToken
       });
 
@@ -114,7 +114,10 @@ class AuthService {
     const payload = { sub: user.id };
     const token = signToken(payload, '15m', config.jwtRecoverySecret);
     const hashedToken = await hashData(token);
-    await this.userService.update(user.id, { recoveryToken: hashedToken });
+
+    await this.userService.updateBySystem(user.id, {
+      recoveryToken: hashedToken
+    });
 
     const mailRecovery = buildRecoveryEmail(user.email, token);
 
@@ -138,7 +141,7 @@ class AuthService {
       };
 
       const hash = await hashData(newPassword);
-      await this.userService.update(user.id, {
+      await this.userService.updateBySystem(user.id, {
         recoveryToken: null,
         refreshToken: null,
         password: hash
@@ -158,13 +161,11 @@ class AuthService {
   };
 
   async logout(userId) {
-
-    await this.userService.update(userId, {
+    await this.userService.updateBySystem(userId, {
       refreshToken: null
     });
 
     return { message: 'Logged out successfully' };
-
   };
 
 };
