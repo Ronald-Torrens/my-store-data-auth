@@ -1,5 +1,4 @@
 const boom = require('@hapi/boom');
-const jwt = require('jsonwebtoken');
 const { config } = require('../config/config');
 
 const UserService = require('./users.service');
@@ -57,54 +56,54 @@ class AuthService {
   };
 
   async refreshToken(refreshToken) {
-  try {
-    const payload = verifyToken(refreshToken);
+    try {
+      const payload = verifyToken(refreshToken);
 
-    const user = await this.userService.findOneWithRefreshToken(payload.sub);
+      const user = await this.userService.findOneWithRefreshToken(payload.sub);
 
-    // 1. validar primero que el usuario y su refreshToken, existan en la BD:
-    if (!user) {
-      throw boom.unauthorized('Invalid credentials');
-    }
+      // 1. validar primero que el usuario y su refreshToken, existan en la BD:
+      if (!user) {
+        throw boom.unauthorized('Invalid credentials');
+      }
 
-    if (!user.refreshToken) {
-      throw boom.unauthorized('Invalid credentials');
-    }
+      if (!user.refreshToken) {
+        throw boom.unauthorized('Invalid credentials');
+      }
 
-    // 2. luego comparar
-    const isMatch = await compareData(refreshToken, user.refreshToken);
+      // 2. luego comparar
+      const isMatch = await compareData(refreshToken, user.refreshToken);
 
-    if (!isMatch) {
-      throw boom.unauthorized('Invalid credentials');
-    }
+      if (!isMatch) {
+        throw boom.unauthorized('Invalid credentials');
+      }
 
-    // 3. generar nuevos tokens
-    const newAccessToken = signToken(
-      { sub: user.id, role: user.role }, '15m'
-    );
+      // 3. generar nuevos tokens
+      const newAccessToken = signToken(
+        { sub: user.id, role: user.role }, '15m'
+      );
 
-    const newRefreshToken = signToken(
-      { sub: user.id, role: user.role }, '7d'
-    );
+      const newRefreshToken = signToken(
+        { sub: user.id, role: user.role }, '7d'
+      );
 
-    const hashedRefreshToken = await hashData(newRefreshToken);
+      const hashedRefreshToken = await hashData(newRefreshToken);
 
-    await this.userService.update(user.id, {
-      refreshToken: hashedRefreshToken
-    });
+      await this.userService.update(user.id, {
+        refreshToken: hashedRefreshToken
+      });
 
-    return {
-      accessToken: newAccessToken,
-      refreshToken: newRefreshToken
+      return {
+        accessToken: newAccessToken,
+        refreshToken: newRefreshToken
+      };
+
+    } catch (error) {
+      if (error.name === 'TokenExpiredError') {
+        throw boom.unauthorized('Refresh token expired');
+      }
+      throw boom.unauthorized('Invalid refresh token');
     };
-
-  } catch (error) {
-    if (error.name === 'TokenExpiredError') {
-      throw boom.unauthorized('Refresh token expired');
-    }
-    throw boom.unauthorized('Invalid refresh token');
   };
-};
 
   async sendRecovery( email ) {
     const user = await this.userService.findByEmail(email);
@@ -121,7 +120,7 @@ class AuthService {
 
     await this.mailService.sendMail(mailRecovery);
     return { message: 'Mail sent.' };
-  }
+  };
 
   async changePassword(token, newPassword) {
     try {
@@ -141,6 +140,7 @@ class AuthService {
       const hash = await hashData(newPassword);
       await this.userService.update(user.id, {
         recoveryToken: null,
+        refreshToken: null,
         password: hash
       });
 
@@ -156,6 +156,17 @@ class AuthService {
       throw boom.unauthorized('Invalid token');
     };
   };
+
+  async logout(userId) {
+
+    await this.userService.update(userId, {
+      refreshToken: null
+    });
+
+    return { message: 'Logged out successfully' };
+
+  };
+
 };
 
 module.exports = AuthService;

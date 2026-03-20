@@ -37,8 +37,8 @@ const service = new AuthService();
 
 router.post('/login',
   loginLimiter,
-  validatorHandler(loginAuthSchema, 'body'),
   passport.authenticate('local', { session: false }),
+  validatorHandler(loginAuthSchema, 'body'),
   async (req, res, next) => {
     try {
       const user = req.user;
@@ -87,6 +87,20 @@ router.post('/change-password',
     } catch (error) {
       next(error);
     };
+  }
+);
+
+router.post('/logout',
+  passport.authenticate('jwt', { session: false }),
+  async (req, res, next) => {
+    try {
+      const userId = req.user.sub;
+      const response = await service.logout(userId);
+      res.status(200).json(response);
+
+    } catch (error) {
+      next(error);
+    }
   }
 );
 

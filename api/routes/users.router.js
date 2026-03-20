@@ -7,16 +7,25 @@ const service = new UsersService();
 const validatorHandler = require('../middleware/validator.handler');
 const { createUserSchema, getUserSchema, updateUserSchema } = require('../schemas/users.schemas');
 
-router.get('/', async (req, res, next) => {
-  try {
-    const users = await service.find();
-    res.status(200).json(users);
-  } catch (error) {
-    next(error)
-  };
-});
+const passport = require('passport');
+const { checkRoles, checkOwnershipOrAdmin } = require('../middleware/auth.handler');
+
+router.get('/',
+  passport.authenticate('jwt', { session: false }),
+  checkRoles('admin'),
+  async (req, res, next) => {
+    try {
+      const users = await service.find();
+      res.status(200).json(users);
+    } catch (error) {
+      next(error)
+    };
+  }
+);
 
 router.get('/:id',
+  passport.authenticate('jwt', { session: false }),
+  checkOwnershipOrAdmin('id'),
   validatorHandler(getUserSchema, 'params'),
   async (req, res, next) => {
     try {
@@ -43,13 +52,16 @@ router.post('/',
 );
 
 router.patch('/:id',
+  passport.authenticate('jwt', { session: false }),
+  checkOwnershipOrAdmin('id'),
   validatorHandler(getUserSchema, 'params'),
   validatorHandler(updateUserSchema, 'body'),
   async (req, res, next) => {
     try {
       const body = req.body;
       const { id } = req.params;
-      const updateUser = await service.update(id, body);
+      const currentUser = req.user;
+      const updateUser = await service.update(id, body, currentUser);
       res.status(201).json(updateUser);
     } catch (error) {
       next(error);
@@ -58,11 +70,14 @@ router.patch('/:id',
 );
 
 router.delete('/:id',
+  passport.authenticate('jwt', { session: false }),
+  checkRoles('admin'),
   validatorHandler(getUserSchema, 'params'),
   async (req, res, next) => {
     try {
       const { id } = req.params;
-      const deleteUser = await service.delete(id);
+      const currentUser = req.user;
+      const deleteUser = await service.delete(id, currentUser);
       res.status(200).json(deleteUser);
     } catch (error) {
       next(error);

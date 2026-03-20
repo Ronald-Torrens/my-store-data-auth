@@ -60,20 +60,38 @@ class UsersService {
     return user;
   };
 
-  async update(id, changes) {
+  async update(id, changes, currentUser) {
     const user = await this.findOne(id);
-    const userUpdate = await user.update(changes);
-    return userUpdate;
+
+    // usuario normal
+    if (currentUser.role !== 'admin') {
+      delete changes.role;
+      delete changes.email;
+    }
+
+    // admin no puede cambiar su propio rol
+    if (currentUser.sub === parseInt(id) && 'role' in changes) {
+      throw boom.forbidden('You cannot change your own role');
+    }
+
+    return await user.update(changes);
   };
 
-  async delete(id) {
+  async delete(id, currentUser) {
     const user = await this.findOne(id);
+
+    // ❌ evitar que el admin se elimine a sí mismo
+    if (currentUser.sub === parseInt(id)) {
+      throw boom.forbidden('You cannot delete your own account');
+    }
+
     await user.destroy();
+
     return {
       message: 'Deleted successfully.',
       id
-    }
-  };
+    };
+}
 };
 
 module.exports = UsersService;
