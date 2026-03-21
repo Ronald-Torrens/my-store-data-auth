@@ -56,6 +56,10 @@ class AuthService {
   };
 
   async refreshToken(refreshToken) {
+    if (!refreshToken) {
+      throw boom.badRequest('Refresh token required');
+    };
+
     try {
       const payload = verifyToken(refreshToken);
 
@@ -74,8 +78,13 @@ class AuthService {
       const isMatch = await compareData(refreshToken, user.refreshToken);
 
       if (!isMatch) {
-        throw boom.unauthorized('Invalid credentials');
-      }
+        // 🚨 posible refresh token robado
+        await this.userService.updateBySystem(user.id, {
+          refreshToken: null
+        });
+
+        throw boom.unauthorized('Refresh token reuse detected. Please login again.');
+      };
 
       // 3. generar nuevos tokens
       const newAccessToken = signToken(
@@ -98,9 +107,12 @@ class AuthService {
       };
 
     } catch (error) {
+      if (error.isBoom) {
+        throw error;
+      };
       if (error.name === 'TokenExpiredError') {
         throw boom.unauthorized('Refresh token expired');
-      }
+      };
       throw boom.unauthorized('Invalid refresh token');
     };
   };
